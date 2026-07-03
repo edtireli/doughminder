@@ -1,0 +1,15 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+
+# Machine-specific
+local.properties
+
+# macOS
+.DS_Store
