@@ -12,15 +12,17 @@ Add multiple starters, each with a name, pronouns (she/he/they), a flour color, 
 
 <p align="center"><img src="screenshots/02_add_starter.png" width="320" alt="New starter screen"></p>
 
-## The daily nag
+## The daily nag — and the negotiation
 
-At reminder time a notification asks *"Did you feed Bertha yet?"* with three reply buttons right on it:
+At feeding time a notification asks *"Time to feed Bertha"* with three reply buttons right on it:
 
-- **Yes, I fed her** → marks fed: *"Good. She forgives you. This time."*
-- **Later** → an instant comeback, then a follow-up after 15/30/60 min (configurable), escalating through a pre-written argument chain laced with real sourdough facts (hooch, acetone smell, pH vs. gluten).
-- **Leave me alone** → one guilt-trip parting shot, then silence until tomorrow.
+- **Yes, I fed her** → marks fed, resets the clock: *"Good. She forgives you. See you tomorrow, same time."*
+- **Later** → she asks **"When?"** (1h / 3h / 6h), then **haggles you shorter** — "Six hours? Be honest with yourself. Bertha's fine for six hours; the problem is you won't remember at hour six. Three?" — before settling on whatever you pick and scheduling the re-nag. Each round escalates and stitches in real sourdough facts (hooch, acetone, pH vs. gluten) and guilt.
+- **Leave me alone** → for a **counter** starter this is *refused*, because a room-temperature starter needs feeding about daily and can't be muted for days. It offers the honest fix — **Move to fridge** (drops her to ~weekly) — or a grudging 1h. Only **fridge/freezer** starters can actually be left until their next real feeding.
 
-<p align="center"><img src="screenshots/05_notification.png" width="320" alt="Feeding reminder notification"> <img src="screenshots/06_argument.png" width="320" alt="The comeback after tapping Later"></p>
+The copy is calibrated to the real timescale: a few hours late is *fine*, the danger is you forgetting; she only turns sour and weak after **days** overdue.
+
+<p align="center"><img src="screenshots/05_notification.png" width="270" alt="Feeding reminder"> <img src="screenshots/06_argument.png" width="270" alt="The counter-offer after tapping Later"> <img src="screenshots/07_leave_me_alone.png" width="270" alt="Leave me alone, refused, with a fridge offer"></p>
 
 ## Recipes
 

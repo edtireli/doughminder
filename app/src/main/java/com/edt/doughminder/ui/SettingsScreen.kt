@@ -81,21 +81,14 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(28.dp))
 
-        Text("“Later” means…", style = MaterialTheme.typography.titleMedium)
+        Text("How “Later” works", style = MaterialTheme.typography.titleMedium)
         Text(
-            "How long before the follow-up argument lands.",
+            "Tap Later on a reminder and your starter asks when — 1, 3, or 6 hours — then " +
+                "haggles you shorter before settling. A room-temperature starter can't be left " +
+                "until tomorrow; it'll suggest the fridge instead. Fridge and freezer starters " +
+                "get longer, calmer schedules.",
             style = MaterialTheme.typography.bodyMedium, color = CreamDim,
         )
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(15, 30, 60).forEach { m ->
-                FilterChip(
-                    selected = settings.nagDelayMinutes == m,
-                    onClick = { onUpdate(settings.copy(nagDelayMinutes = m)) },
-                    label = { Text("$m min") },
-                )
-            }
-        }
         Spacer(Modifier.height(36.dp))
 
         TextButton(onClick = onTestNotification) {

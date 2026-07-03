@@ -16,7 +16,7 @@ class DoughApp : Application() {
         // and anything BootReceiver missed.
         CoroutineScope(Dispatchers.Default).launch {
             StarterRepository.get(this@DoughApp).currentStarters().forEach {
-                ReminderScheduler.scheduleDaily(this@DoughApp, it)
+                ReminderScheduler.scheduleNext(this@DoughApp, it)
             }
         }
     }

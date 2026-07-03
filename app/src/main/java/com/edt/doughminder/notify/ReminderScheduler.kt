@@ -6,76 +6,93 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.edt.doughminder.data.Starter
+import com.edt.doughminder.data.Storage
+import com.edt.doughminder.data.intervalHours
 import java.util.Calendar
 
 object ReminderScheduler {
 
-    private fun alarmManager(context: Context) =
-        context.getSystemService(AlarmManager::class.java)
+    private fun am(context: Context) = context.getSystemService(AlarmManager::class.java)
 
-    private fun reminderIntent(context: Context, starterId: String): PendingIntent {
+    private fun reminderIntent(context: Context, starterId: String, depth: Int): PendingIntent {
         val intent = Intent(context, ReminderReceiver::class.java)
             .putExtra(Notify.EXTRA_STARTER_ID, starterId)
+            .putExtra(Notify.EXTRA_DEPTH, depth)
         return PendingIntent.getBroadcast(
-            context,
-            starterId.hashCode(),
-            intent,
+            context, (starterId + "d" + depth).hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 
-    /** Next occurrence of the starter's reminder time, today or tomorrow. */
-    fun nextTrigger(hour: Int, minute: Int, now: Long = System.currentTimeMillis()): Long {
+    /** Next base reminder occurrence, honoring storage cadence + reminder hour. */
+    fun nextTrigger(starter: Starter, now: Long = System.currentTimeMillis()): Long {
         val cal = Calendar.getInstance().apply {
             timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
+            set(Calendar.HOUR_OF_DAY, starter.reminderHour)
+            set(Calendar.MINUTE, starter.reminderMinute)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
-            if (timeInMillis <= now) add(Calendar.DAY_OF_YEAR, 1)
         }
-        return cal.timeInMillis
+        return when (starter.storage) {
+            Storage.ROOM -> {
+                if (cal.timeInMillis <= now) cal.add(Calendar.DAY_OF_YEAR, 1)
+                cal.timeInMillis
+            }
+            Storage.FRIDGE, Storage.FREEZER -> {
+                // Base off the last feeding; land on the reminder hour of that day.
+                val base = starter.lastFedEpochMillis ?: now
+                var target = base + starter.storage.intervalHours * 3_600_000L
+                if (target <= now) target = now + 3_600_000L // overdue → nudge within the hour
+                Calendar.getInstance().apply {
+                    timeInMillis = target
+                    set(Calendar.HOUR_OF_DAY, starter.reminderHour)
+                    set(Calendar.MINUTE, starter.reminderMinute)
+                    set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                    if (timeInMillis <= now) add(Calendar.DAY_OF_YEAR, 1)
+                }.timeInMillis
+            }
+        }
     }
 
-    fun scheduleDaily(context: Context, starter: Starter) {
-        val at = nextTrigger(starter.reminderHour, starter.reminderMinute)
-        setAlarm(context, at, reminderIntent(context, starter.id))
+    /** (Re)arm the base reminder for a starter. */
+    fun scheduleNext(context: Context, starter: Starter) {
+        setAlarm(context, nextTrigger(starter), reminderIntent(context, starter.id, 0))
     }
 
     fun cancel(context: Context, starterId: String) {
-        alarmManager(context).cancel(reminderIntent(context, starterId))
+        am(context).cancel(reminderIntent(context, starterId, 0))
     }
 
-    /** Follow-up nag partway through an argument ("later" snooze). */
-    fun scheduleNag(context: Context, starterId: String, depth: Int, delayMinutes: Int) {
+    /** A negotiated snooze — re-nag in [hours] hours at the given escalation depth. */
+    fun scheduleSnoozeHours(context: Context, starterId: String, hours: Int, depth: Int) {
+        scheduleSnoozeMinutes(context, starterId, hours * 60, depth)
+    }
+
+    /** Short follow-up (e.g. the "you said now" verify check). */
+    fun scheduleSnoozeMinutes(context: Context, starterId: String, minutes: Int, depth: Int) {
         val intent = Intent(context, ReminderReceiver::class.java)
             .putExtra(Notify.EXTRA_STARTER_ID, starterId)
             .putExtra(Notify.EXTRA_DEPTH, depth)
         val pi = PendingIntent.getBroadcast(
-            context,
-            ("nag" + starterId).hashCode(),
-            intent,
+            context, ("snooze" + starterId).hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        setAlarm(context, System.currentTimeMillis() + delayMinutes * 60_000L, pi)
+        setAlarm(context, System.currentTimeMillis() + minutes * 60_000L, pi)
     }
 
     fun scheduleTimer(context: Context, title: String, minutes: Int) {
-        val intent = Intent(context, TimerReceiver::class.java)
-            .putExtra("title", title)
+        val intent = Intent(context, TimerReceiver::class.java).putExtra("title", title)
         val pi = PendingIntent.getBroadcast(
-            context,
-            ("timer" + title + System.currentTimeMillis()).hashCode(),
-            intent,
+            context, ("timer" + title).hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         setAlarm(context, System.currentTimeMillis() + minutes * 60_000L, pi)
     }
 
     private fun setAlarm(context: Context, at: Long, pi: PendingIntent) {
-        val am = alarmManager(context)
-        val canExact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
-        if (canExact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
-        else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+        val m = am(context)
+        val canExact = Build.VERSION.SDK_INT < 31 || m.canScheduleExactAlarms()
+        if (canExact) m.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+        else m.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
     }
 }

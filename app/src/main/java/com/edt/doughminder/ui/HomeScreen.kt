@@ -29,26 +29,42 @@ import com.edt.doughminder.ui.theme.Amber
 import com.edt.doughminder.ui.theme.CreamDim
 import com.edt.doughminder.ui.theme.InkBorder
 import com.edt.doughminder.ui.theme.InkRaised
+import com.edt.doughminder.data.Storage
+import com.edt.doughminder.data.intervalHours
 import com.edt.doughminder.ui.theme.Sage
 import com.edt.doughminder.ui.theme.StarterPalette
 
 private fun moodOf(starter: Starter): JarMood {
+    if (starter.storage == Storage.FREEZER) return JarMood.SLEEPING
     val h = starter.hoursSinceFed() ?: return JarMood.WORRIED
+    val limit = starter.storage.intervalHours
     return when {
-        h < 20 -> JarMood.HAPPY
-        h < 48 -> JarMood.WORRIED
+        h < limit * 0.85 -> JarMood.HAPPY
+        h < limit * 1.3 -> JarMood.WORRIED
         else -> JarMood.ANGRY
     }
 }
 
+private fun ago(hours: Long): String = when {
+    hours < 1 -> "just now"
+    hours < 48 -> "${hours}h ago"
+    else -> "${hours / 24}d ago"
+}
+
 private fun statusText(starter: Starter): Pair<String, androidx.compose.ui.graphics.Color> {
+    val where = when (starter.storage) {
+        Storage.ROOM -> ""
+        Storage.FRIDGE -> "In the fridge · "
+        Storage.FREEZER -> "In the freezer · "
+    }
     val h = starter.hoursSinceFed()
-        ?: return "Never fed. Yikes." to Amber
+        ?: return "${where}never fed" to Amber
+    val limit = starter.storage.intervalHours
     return when {
-        h < 1 -> "Fed just now" to Sage
-        h < 20 -> "Fed ${h}h ago" to Sage
-        h < 48 -> "Hungry — ${h}h since feeding" to Amber
-        else -> "STARVING — ${h / 24} days" to MaterialTheme_error
+        starter.storage == Storage.FREEZER -> "${where}napping" to Sage
+        h < limit * 0.85 -> "${where}fed ${ago(h)}" to Sage
+        h < limit * 1.3 -> "${where}hungry — fed ${ago(h)}" to Amber
+        else -> "${where}STARVING — fed ${ago(h)}" to MaterialTheme_error
     }
 }
 

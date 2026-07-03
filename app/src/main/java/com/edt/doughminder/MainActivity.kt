@@ -134,7 +134,7 @@ private fun DoughminderApp() {
                     onSave = { starter ->
                         scope.launch {
                             repo.upsert(starter)
-                            ReminderScheduler.scheduleDaily(context, starter)
+                            ReminderScheduler.scheduleNext(context, starter)
                         }
                         closeEditor()
                     },
@@ -174,13 +174,7 @@ private fun DoughminderApp() {
                             id = "demo", name = "Demo Dough",
                             createdAt = System.currentTimeMillis(),
                         )
-                        Notify.postNag(
-                            context, target,
-                            title = Sass.morningTitle(target),
-                            body = Sass.morningBody(target),
-                            depth = 0,
-                            channel = Channels.REMINDERS,
-                        )
+                        Notify.postNag(context, target, depth = 0, channel = Channels.REMINDERS)
                     },
                 )
             }

@@ -3,9 +3,9 @@ package com.edt.doughminder.notify
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.core.app.NotificationManagerCompat
 import com.edt.doughminder.data.Sass
 import com.edt.doughminder.data.StarterRepository
+import com.edt.doughminder.data.Storage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,7 +22,7 @@ private fun BroadcastReceiver.async(block: suspend () -> Unit) {
     }
 }
 
-/** Fires at the scheduled reminder time (or a snoozed follow-up). */
+/** Fires at a scheduled reminder time (base cadence) or a negotiated snooze. */
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) = async {
         val repo = StarterRepository.get(context)
@@ -30,84 +30,79 @@ class ReminderReceiver : BroadcastReceiver() {
         val depth = intent.getIntExtra(Notify.EXTRA_DEPTH, 0)
         val starter = repo.getStarter(id) ?: return@async
 
-        if (depth == 0) {
-            // The daily opener. Skip the nag if already fed today, but always
-            // re-arm tomorrow's alarm.
-            if (!starter.fedToday()) {
-                Notify.postNag(
-                    context, starter,
-                    title = Sass.morningTitle(starter),
-                    body = Sass.morningBody(starter),
-                    depth = 0,
-                    channel = Channels.REMINDERS,
-                )
-            }
-            ReminderScheduler.scheduleDaily(context, starter)
-        } else {
-            // Snoozed follow-up in an ongoing argument.
-            if (!starter.fedToday()) {
-                Notify.postNag(
-                    context, starter,
-                    title = "Still waiting. So is ${starter.name}.",
-                    body = Sass.laterReply(starter, depth),
-                    depth = depth,
-                    channel = Channels.ARGUMENTS,
-                )
-            }
+        // depth 0 is the base cadence alarm — always re-arm the next one.
+        if (depth == 0) ReminderScheduler.scheduleNext(context, starter)
+
+        if (!starter.fedRecently()) {
+            Notify.postNag(
+                context, starter, depth,
+                channel = if (depth == 0) Channels.REMINDERS else Channels.ARGUMENTS,
+            )
         }
     }
 }
 
-/** Handles the buttons on the notification — the user's side of the argument. */
+/** The user's side of the argument — every notification button lands here. */
 class ActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) = async {
         val repo = StarterRepository.get(context)
         val id = intent.getStringExtra(Notify.EXTRA_STARTER_ID) ?: return@async
+        val hours = intent.getIntExtra(Notify.EXTRA_HOURS, 0)
         val depth = intent.getIntExtra(Notify.EXTRA_DEPTH, 0)
         val starter = repo.getStarter(id) ?: return@async
         val settings = repo.currentSettings()
-        val nm = NotificationManagerCompat.from(context)
 
         when (intent.action) {
             Notify.ACTION_FED -> {
                 repo.markFed(id)
-                nm.cancel(Notify.notificationId(starter))
+                Notify.cancel(context, starter)
                 if (settings.argueBack) {
-                    Notify.postSimple(
-                        context, Notify.notificationId(starter), Channels.ARGUMENTS,
-                        title = starter.name, body = Sass.fedReply(starter),
-                    )
+                    Notify.postLine(context, starter, starter.name, Sass.fedReply(starter))
                 }
+                // Feeding resets the cadence; re-arm from the new lastFed.
+                repo.getStarter(id)?.let { ReminderScheduler.scheduleNext(context, it) }
             }
 
             Notify.ACTION_LATER -> {
-                nm.cancel(Notify.notificationId(starter))
-                if (settings.argueBack) {
-                    // Immediate comeback, then a re-nag after the snooze delay.
-                    Notify.postNag(
-                        context, starter,
-                        title = "“Later.” Sure.",
-                        body = Sass.laterReply(starter, depth),
-                        depth = depth + 1,
-                        channel = Channels.ARGUMENTS,
-                    )
-                    ReminderScheduler.scheduleNag(context, id, depth + 1, settings.nagDelayMinutes)
-                }
+                if (settings.argueBack) Notify.postWhen(context, starter, depth)
+                else { Notify.cancel(context, starter); ReminderScheduler.scheduleSnoozeHours(context, id, 1, depth + 1) }
+            }
+
+            // Picked a duration → counter-offer / "are you sure?"
+            Notify.ACTION_PICK -> Notify.postConfirm(context, starter, hours, depth)
+
+            // Settled on a duration → schedule the re-nag, escalate next round.
+            Notify.ACTION_CONFIRM -> {
+                Notify.cancel(context, starter)
+                ReminderScheduler.scheduleSnoozeHours(context, id, hours, depth + 1)
+                Notify.postLine(context, starter, "Okay — ${hours}h.", Sass.settledBody(starter, hours))
+            }
+
+            // "Actually, now" → dismiss, then a short verify nudge.
+            Notify.ACTION_NOW -> {
+                Notify.cancel(context, starter)
+                ReminderScheduler.scheduleSnoozeMinutes(context, id, 15, depth + 1)
+                Notify.postLine(context, starter, "Now. Good.", Sass.nowBody(starter))
             }
 
             Notify.ACTION_LEAVE -> {
-                nm.cancel(Notify.notificationId(starter))
-                if (settings.argueBack) {
-                    // One parting shot, no buttons, then silence until tomorrow.
-                    Notify.postNag(
-                        context, starter,
-                        title = "Fine.",
-                        body = Sass.leaveMeAloneReply(starter),
-                        depth = depth,
-                        channel = Channels.ARGUMENTS,
-                        withActions = false,
-                    )
+                if (starter.storage == Storage.ROOM) {
+                    // Refuse — a counter starter can't be left. Offer the real fix.
+                    Notify.postCantLeave(context, starter, depth)
+                } else {
+                    // Fridge/freezer: honored. Next reminder is the long cadence.
+                    Notify.cancel(context, starter)
+                    ReminderScheduler.scheduleNext(context, starter)
+                    Notify.postLine(context, starter, "Alright.", Sass.leaveHonoredBody(starter))
                 }
+            }
+
+            Notify.ACTION_MOVE_FRIDGE -> {
+                val fridged = starter.copy(storage = Storage.FRIDGE)
+                repo.upsert(fridged)
+                Notify.cancel(context, starter)
+                ReminderScheduler.scheduleNext(context, fridged)
+                Notify.postLine(context, fridged, "Into the fridge.", Sass.movedToFridgeBody(fridged))
             }
         }
     }
@@ -124,7 +119,7 @@ class TimerReceiver : BroadcastReceiver() {
     }
 }
 
-/** Re-arm all alarms after reboot or app update. */
+/** Re-arm all base reminders after reboot or app update. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
@@ -132,7 +127,7 @@ class BootReceiver : BroadcastReceiver() {
         ) return
         async {
             StarterRepository.get(context).currentStarters().forEach {
-                ReminderScheduler.scheduleDaily(context, it)
+                ReminderScheduler.scheduleNext(context, it)
             }
         }
     }

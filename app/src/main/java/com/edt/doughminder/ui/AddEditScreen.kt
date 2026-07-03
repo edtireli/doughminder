@@ -37,11 +37,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.edt.doughminder.data.Gender
 import com.edt.doughminder.data.Starter
+import com.edt.doughminder.data.Storage
 import com.edt.doughminder.ui.theme.Coral
 import com.edt.doughminder.ui.theme.Cream
 import com.edt.doughminder.ui.theme.CreamDim
 import com.edt.doughminder.ui.theme.StarterPalette
 import java.util.UUID
+
+private fun objName(g: Gender) = when (g) {
+    Gender.SHE -> "she"; Gender.HE -> "he"; Gender.THEY -> "they"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +62,7 @@ fun AddEditScreen(
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var gender by remember { mutableStateOf(existing?.gender ?: Gender.SHE) }
     var jarColor by remember { mutableStateOf(existing?.jarColor ?: 0) }
+    var storage by remember { mutableStateOf(existing?.storage ?: Storage.ROOM) }
     var hour by remember { mutableStateOf(existing?.reminderHour ?: defaultHour) }
     var minute by remember { mutableStateOf(existing?.reminderMinute ?: defaultMinute) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -124,7 +130,30 @@ fun AddEditScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        Text("Daily reminder", style = MaterialTheme.typography.titleMedium)
+        Text("Where does ${objName(gender)} live?", style = MaterialTheme.typography.titleMedium)
+        Text(
+            when (storage) {
+                Storage.ROOM -> "On the counter — daily feedings, and no leaving it alone."
+                Storage.FRIDGE -> "In the fridge — about weekly, calmer reminders."
+                Storage.FREEZER -> "In the freezer — dormant, a monthly check-in."
+            },
+            style = MaterialTheme.typography.bodyMedium, color = CreamDim,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Storage.entries.forEach { s ->
+                FilterChip(
+                    selected = storage == s,
+                    onClick = { storage = s },
+                    label = {
+                        Text(when (s) { Storage.ROOM -> "Counter"; Storage.FRIDGE -> "Fridge"; Storage.FREEZER -> "Freezer" })
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        Text("Reminder time", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { showTimePicker = true }) {
             Text("%d:%02d".format(hour, minute), color = Cream)
@@ -138,6 +167,7 @@ fun AddEditScreen(
                     name = name.trim().ifEmpty { "The Blob" },
                     gender = gender,
                     jarColor = jarColor,
+                    storage = storage,
                     reminderHour = hour,
                     reminderMinute = minute,
                     lastFedEpochMillis = existing?.lastFedEpochMillis,

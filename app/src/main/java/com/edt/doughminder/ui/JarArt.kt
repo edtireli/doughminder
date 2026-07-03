@@ -15,7 +15,7 @@ import com.edt.doughminder.ui.theme.Coral
 import com.edt.doughminder.ui.theme.Cream
 import com.edt.doughminder.ui.theme.Ink
 
-enum class JarMood { HAPPY, WORRIED, ANGRY }
+enum class JarMood { HAPPY, WORRIED, ANGRY, SLEEPING }
 
 /**
  * A little jar of starter with a face. Mood tracks hunger:
@@ -69,11 +69,22 @@ fun JarArt(doughColor: Color, mood: JarMood, modifier: Modifier = Modifier) {
 
         // face
         val eyeY = doughTop + h * 0.10f
-        drawCircle(Ink, radius = w * 0.024f, center = Offset(w * 0.42f, eyeY))
-        drawCircle(Ink, radius = w * 0.024f, center = Offset(w * 0.58f, eyeY))
+        if (mood == JarMood.SLEEPING) {
+            // closed, content eyes (downward arcs)
+            for (cx in listOf(0.42f, 0.58f)) {
+                val eye = Path().apply {
+                    moveTo(w * (cx - 0.03f), eyeY)
+                    quadraticBezierTo(w * cx, eyeY + h * 0.025f, w * (cx + 0.03f), eyeY)
+                }
+                drawPath(eye, Ink, style = Stroke(width = w * 0.016f))
+            }
+        } else {
+            drawCircle(Ink, radius = w * 0.024f, center = Offset(w * 0.42f, eyeY))
+            drawCircle(Ink, radius = w * 0.024f, center = Offset(w * 0.58f, eyeY))
+        }
         val mouth = Path()
         when (mood) {
-            JarMood.HAPPY -> {
+            JarMood.HAPPY, JarMood.SLEEPING -> {
                 mouth.moveTo(w * 0.44f, eyeY + h * 0.06f)
                 mouth.quadraticBezierTo(w * 0.50f, eyeY + h * 0.10f, w * 0.56f, eyeY + h * 0.06f)
             }
@@ -90,6 +101,14 @@ fun JarArt(doughColor: Color, mood: JarMood, modifier: Modifier = Modifier) {
             }
         }
         drawPath(mouth, Ink, style = Stroke(width = w * 0.016f))
+        // a little "z" for the sleeper
+        if (mood == JarMood.SLEEPING) {
+            val zx = w * 0.70f; val zy = doughTop - h * 0.02f; val s = w * 0.05f
+            val z = Path().apply {
+                moveTo(zx, zy); lineTo(zx + s, zy); lineTo(zx, zy + s); lineTo(zx + s, zy + s)
+            }
+            drawPath(z, Ink, style = Stroke(width = w * 0.014f))
+        }
 
         // mason-jar lid: single slim cap, a touch wider than the jar
         drawRoundRect(
