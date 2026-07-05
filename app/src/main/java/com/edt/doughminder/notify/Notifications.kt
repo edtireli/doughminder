@@ -100,9 +100,16 @@ object Notify {
     }
 
     // ── Stage 1: the nag ────────────────────────────────────────────────
-    fun postNag(context: Context, starter: Starter, depth: Int, channel: String = Channels.REMINDERS) {
+    // `promised`: 0 = fresh/daily, >0 = they said "in N hours", -1 = "now".
+    fun postNag(
+        context: Context,
+        starter: Starter,
+        depth: Int,
+        promised: Int = 0,
+        channel: String = Channels.REMINDERS,
+    ) {
         val obj = Sass.objPronoun(starter)
-        val b = base(context, channel, Sass.nagTitle(starter, depth), Sass.nagBody(starter, depth))
+        val b = base(context, channel, Sass.nagTitle(starter, depth, promised), Sass.nagBody(starter, depth, promised))
             .addAction(0, "Yes, I fed $obj", action(context, ACTION_FED, starter.id, 0, depth))
             .addAction(0, "Later", action(context, ACTION_LATER, starter.id, 0, depth))
             .addAction(0, "Leave me alone", action(context, ACTION_LEAVE, starter.id, 0, depth))

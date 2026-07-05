@@ -47,6 +47,45 @@ import kotlinx.coroutines.launch
 
 private enum class Tab { STARTERS, RECIPES, SETTINGS }
 
+/**
+ * Nudge the OS to stop deferring/killing our alarms. USE_EXACT_ALARM already
+ * gives exact scheduling on API 33+; the remaining lever on aggressive OEMs is
+ * the battery-optimization exemption, plus the exact-alarm grant on API 31–32.
+ */
+private fun requestReliability(context: android.content.Context) {
+    if (Build.VERSION.SDK_INT in 31..32) {
+        val am = context.getSystemService(android.app.AlarmManager::class.java)
+        if (am?.canScheduleExactAlarms() == false) {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+            return
+        }
+    }
+    val pm = context.getSystemService(android.os.PowerManager::class.java)
+    if (Build.VERSION.SDK_INT >= 23 && pm?.isIgnoringBatteryOptimizations(context.packageName) == false) {
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(android.net.Uri.parse("package:${context.packageName}"))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    } else {
+        // Already exempt — send them to the app's notification settings as a fallback.
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
 
     private val notifPermission =
@@ -176,6 +215,7 @@ private fun DoughminderApp() {
                         )
                         Notify.postNag(context, target, depth = 0, channel = Channels.REMINDERS)
                     },
+                    onFixReliability = { requestReliability(context) },
                 )
             }
         }

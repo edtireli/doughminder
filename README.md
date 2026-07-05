@@ -17,7 +17,7 @@ Add multiple starters, each with a name, pronouns (she/he/they), a flour color, 
 At feeding time a notification asks *"Time to feed Bertha"* with three reply buttons right on it:
 
 - **Yes, I fed her** → marks fed, resets the clock: *"Good. She forgives you. See you tomorrow, same time."*
-- **Later** → she asks **"When?"** (1h / 3h / 6h), then **haggles you shorter** — "Six hours? Be honest with yourself. Bertha's fine for six hours; the problem is you won't remember at hour six. Three?" — before settling on whatever you pick and scheduling the re-nag. Each round escalates and stitches in real sourdough facts (hooch, acetone, pH vs. gluten) and guilt.
+- **Later** → she asks **"When?"** (1h / 3h / 6h), then **haggles you shorter** — "Six hours? Be honest with yourself. Bertha's fine for six hours; the problem is you won't remember at hour six. Three?" — before settling on whatever you pick and **setting a real alarm** for it. When it fires she calls out the promise: *"You said 1 hour. Time's up. Where's the flour?"* Each round escalates and stitches in real sourdough facts (hooch, acetone, pH vs. gluten) and guilt.
 - **Leave me alone** → for a **counter** starter this is *refused*, because a room-temperature starter needs feeding about daily and can't be muted for days. It offers the honest fix — **Move to fridge** (drops her to ~weekly) — or a grudging 1h. Only **fridge/freezer** starters can actually be left until their next real feeding.
 
 The copy is calibrated to the real timescale: a few hours late is *fine*, the danger is you forgetting; she only turns sour and weak after **days** overdue.
@@ -40,7 +40,8 @@ Default reminder time for new starters, the "Argue back" toggle, the snooze leng
 
 - Kotlin + Jetpack Compose (Material 3), warm dark theme (ink `#262624`, cream text, coral `#D97757`, serif display type). No backend — everything is on-device.
 - `data/Sass.kt` is the argument engine: pre-written escalation chains with `{name}`/`{she}`/`{her}` pronoun templating, isolated behind small functions (`morningTitle`, `laterReply(depth)`, …) so a lightweight on-device LLM could replace the line-picking later without touching the notification plumbing.
-- Reminders use `AlarmManager` (exact when permitted, inexact fallback), re-armed on boot, app update, and app start. Starters and settings persist as JSON in DataStore.
+- **Reliable background firing** is the whole point, so alarms don't cut corners: the app holds `USE_EXACT_ALARM`, snoozes are scheduled with `setAlarmClock` (the highest-priority, Doze-proof alarm — it even shows the system alarm icon), and the daily reminder uses `setExactAndAllowWhileIdle`. Both are exact **wake-from-idle** alarms, so they fire on time even if the app has been closed for days. Everything is re-armed on boot, app update, and app start. Settings has a **"Make reminders reliable"** button that requests a battery-optimization exemption for OEMs that kill background apps.
+- Starters and settings persist as JSON in DataStore.
 
 ## Build & install
 

@@ -39,6 +39,7 @@ fun SettingsScreen(
     settings: AppSettings,
     onUpdate: (AppSettings) -> Unit,
     onTestNotification: () -> Unit,
+    onFixReliability: () -> Unit,
 ) {
     var showTimePicker by remember { mutableStateOf(false) }
 
@@ -89,6 +90,19 @@ fun SettingsScreen(
                 "get longer, calmer schedules.",
             style = MaterialTheme.typography.bodyMedium, color = CreamDim,
         )
+        Spacer(Modifier.height(28.dp))
+
+        Text("Reminders not showing up on time?", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Some phones aggressively pause background apps, which can delay or swallow " +
+                "reminders. Tap below and allow Doughminder to run unrestricted so alarms " +
+                "fire exactly when they should — even overnight.",
+            style = MaterialTheme.typography.bodyMedium, color = CreamDim,
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onFixReliability) {
+            Text("Make reminders reliable", color = Cream)
+        }
         Spacer(Modifier.height(36.dp))
 
         TextButton(onClick = onTestNotification) {

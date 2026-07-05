@@ -28,6 +28,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val repo = StarterRepository.get(context)
         val id = intent.getStringExtra(Notify.EXTRA_STARTER_ID) ?: return@async
         val depth = intent.getIntExtra(Notify.EXTRA_DEPTH, 0)
+        val promised = intent.getIntExtra(Notify.EXTRA_HOURS, 0)
         val starter = repo.getStarter(id) ?: return@async
 
         // depth 0 is the base cadence alarm — always re-arm the next one.
@@ -35,7 +36,7 @@ class ReminderReceiver : BroadcastReceiver() {
 
         if (!starter.fedRecently()) {
             Notify.postNag(
-                context, starter, depth,
+                context, starter, depth, promised,
                 channel = if (depth == 0) Channels.REMINDERS else Channels.ARGUMENTS,
             )
         }
@@ -65,23 +66,23 @@ class ActionReceiver : BroadcastReceiver() {
 
             Notify.ACTION_LATER -> {
                 if (settings.argueBack) Notify.postWhen(context, starter, depth)
-                else { Notify.cancel(context, starter); ReminderScheduler.scheduleSnoozeHours(context, id, 1, depth + 1) }
+                else { Notify.cancel(context, starter); ReminderScheduler.scheduleSnoozeHours(context, id, 1, depth + 1, promised = 1) }
             }
 
             // Picked a duration → counter-offer / "are you sure?"
             Notify.ACTION_PICK -> Notify.postConfirm(context, starter, hours, depth)
 
-            // Settled on a duration → schedule the re-nag, escalate next round.
+            // Settled on a duration → set a real alarm, escalate next round.
             Notify.ACTION_CONFIRM -> {
                 Notify.cancel(context, starter)
-                ReminderScheduler.scheduleSnoozeHours(context, id, hours, depth + 1)
+                ReminderScheduler.scheduleSnoozeHours(context, id, hours, depth + 1, promised = hours)
                 Notify.postLine(context, starter, "Okay — ${hours}h.", Sass.settledBody(starter, hours))
             }
 
-            // "Actually, now" → dismiss, then a short verify nudge.
+            // "Actually, now" → dismiss, then a short "you said now" check.
             Notify.ACTION_NOW -> {
                 Notify.cancel(context, starter)
-                ReminderScheduler.scheduleSnoozeMinutes(context, id, 15, depth + 1)
+                ReminderScheduler.scheduleSnoozeMinutes(context, id, 15, depth + 1, promised = -1)
                 Notify.postLine(context, starter, "Now. Good.", Sass.nowBody(starter))
             }
 
