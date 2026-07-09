@@ -31,14 +31,15 @@ class ReminderReceiver : BroadcastReceiver() {
         val promised = intent.getIntExtra(Notify.EXTRA_HOURS, 0)
         val starter = repo.getStarter(id) ?: return@async
 
-        // depth 0 is the base cadence alarm — always re-arm the next one.
-        if (depth == 0) ReminderScheduler.scheduleNext(context, starter)
-
-        if (!starter.fedRecently()) {
-            Notify.postNag(
-                context, starter, depth, promised,
-                channel = if (depth == 0) Channels.REMINDERS else Channels.ARGUMENTS,
-            )
+        if (depth == 0) {
+            // Base daily reminder: re-arm tomorrow and ALWAYS fire on the dot at
+            // the time the user set — that's the whole job. A "Yes, I fed her"
+            // tap is one press away if they already did.
+            ReminderScheduler.scheduleNext(context, starter)
+            Notify.postNag(context, starter, 0, 0, channel = Channels.REMINDERS)
+        } else if (!starter.fedRecently()) {
+            // A promised snooze re-nag — skip it only if they've since fed.
+            Notify.postNag(context, starter, depth, promised, channel = Channels.ARGUMENTS)
         }
     }
 }

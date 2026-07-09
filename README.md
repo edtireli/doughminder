@@ -26,31 +26,47 @@ The copy is calibrated to the real timescale: a few hours late is *fine*, the da
 
 ## Recipes
 
-Recipes with per-step timers that fire notifications when it's time for the next move. Add recipes in `app/src/main/java/com/edt/doughminder/data/Recipes.kt` (same `Recipe`/`RecipeStep` shape) and they appear automatically.
+Ships with **Sesame Sourdough (Loaf or Buns)** — a half-graham, wheat-gluten-boosted, sesame-crusted dough — broken into steps with per-step timers that fire a notification when it's time for the next move (build the starter, autolyse, mix, bulk rise, folds every 20 min, cold proof, bake). Add more in `app/src/main/java/com/edt/doughminder/data/Recipes.kt` (same `Recipe`/`RecipeStep` shape) and they appear automatically.
 
 <p align="center"><img src="screenshots/03_recipes.png" width="320" alt="Recipes screen"></p>
 
 ## Settings
 
-Default reminder time for new starters, the "Argue back" toggle, the snooze length, and a test nag button.
+Default reminder time for new starters, the "Argue back" toggle, a "Make reminders reliable" button, and a test nag button.
 
 <p align="center"><img src="screenshots/04_settings.png" width="320" alt="Settings screen"></p>
 
 ## Architecture notes
 
 - Kotlin + Jetpack Compose (Material 3), warm dark theme (ink `#262624`, cream text, coral `#D97757`, serif display type). No backend — everything is on-device.
-- `data/Sass.kt` is the argument engine: pre-written escalation chains with `{name}`/`{she}`/`{her}` pronoun templating, isolated behind small functions (`morningTitle`, `laterReply(depth)`, …) so a lightweight on-device LLM could replace the line-picking later without touching the notification plumbing.
-- **Reliable background firing** is the whole point, so alarms don't cut corners: the app holds `USE_EXACT_ALARM`, snoozes are scheduled with `setAlarmClock` (the highest-priority, Doze-proof alarm — it even shows the system alarm icon), and the daily reminder uses `setExactAndAllowWhileIdle`. Both are exact **wake-from-idle** alarms, so they fire on time even if the app has been closed for days. Everything is re-armed on boot, app update, and app start. Settings has a **"Make reminders reliable"** button that requests a battery-optimization exemption for OEMs that kill background apps.
+- `data/Sass.kt` is the argument engine: pre-written escalation chains with `{name}`/`{she}`/`{her}` pronoun templating and large fact/guilt pools, isolated behind small functions (`nagBody(depth, promised)`, `confirmBody(hours)`, `settledBody(hours)`, …) so a lightweight on-device LLM could replace the line-picking later without touching the notification plumbing.
+- **The daily reminder fires on the dot** at the time you set, every 24h, whether or not the app is open. Both the daily reminder and the snoozes use `setAlarmClock` — the single most reliable alarm Android offers: exact, and exempt from Doze, app-standby, *and* (on most OEMs) battery-optimization killing, because breaking it would break the system clock. Each alarm re-arms the next one, and everything is re-armed on boot, app update, and app start. The app also holds `USE_EXACT_ALARM`, and Settings has a **"Make reminders reliable"** button that requests a battery-optimization exemption for the most aggressive OEMs.
 - Starters and settings persist as JSON in DataStore.
 
 ## Build & install
 
+**Release (the real app — signed, installable, what you want on your phone):**
+
 ```bash
-./gradlew assembleDebug        # JDK path comes from gradle.properties
-adb install app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease
+adb install app/build/outputs/apk/release/app-release.apk
 ```
 
-Or open the folder in Android Studio and hit Run.
+Release signing reads `keystore.properties` at the repo root (gitignored, along with the `.jks`). To recreate it on a fresh clone:
+
+```bash
+keytool -genkeypair -v -keystore app/doughminder-release.jks -alias doughminder \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -storepass CHANGEME -keypass CHANGEME -dname "CN=Doughminder"
+cat > keystore.properties <<'EOF'
+storeFile=doughminder-release.jks
+storePassword=CHANGEME
+keyAlias=doughminder
+keyPassword=CHANGEME
+EOF
+```
+
+If `keystore.properties` is absent the release build is unsigned; debug builds (`./gradlew assembleDebug`) always work without it.
 
 Requires a `local.properties` with your SDK path (Android Studio creates it automatically):
 
@@ -58,4 +74,4 @@ Requires a `local.properties` with your SDK path (Android Studio creates it auto
 sdk.dir=/Users/you/Library/Android/sdk
 ```
 
-On first launch, allow notifications. For minute-exact reminders on Android 14+, grant "Alarms & reminders" in system settings — the app falls back to approximately-on-time otherwise.
+On first launch, allow notifications. The daily reminder uses `setAlarmClock`, so it fires exactly on time without any extra permission — but on aggressive OEMs (Xiaomi, Samsung, etc.) tap **Settings → "Make reminders reliable"** once to exempt the app from background killing.

@@ -32,6 +32,13 @@ import com.edt.doughminder.ui.theme.CreamDim
 import com.edt.doughminder.ui.theme.InkBorder
 import com.edt.doughminder.ui.theme.InkRaised
 
+private fun formatDuration(minutes: Int): String {
+    if (minutes < 60) return "$minutes min"
+    val h = minutes / 60
+    val m = minutes % 60
+    return if (m == 0) "${h}h" else "${h}h ${m}m"
+}
+
 @Composable
 fun RecipesScreen(onStartTimer: (stepTitle: String, minutes: Int) -> Unit) {
     LazyColumn(
@@ -82,7 +89,7 @@ private fun RecipeCard(recipe: Recipe, onStartTimer: (String, Int) -> Unit) {
                                 onClick = { onStartTimer(step.title, step.timerMinutes) },
                                 contentPadding = PaddingValues(0.dp),
                             ) {
-                                Text("Start ${step.timerMinutes} min timer ⏱", color = Coral)
+                                Text("Start timer — ${formatDuration(step.timerMinutes)} ⏱", color = Coral)
                             }
                         }
                     }

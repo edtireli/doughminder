@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.edt.doughminder.MainActivity
 import com.edt.doughminder.data.Starter
 import com.edt.doughminder.data.Storage
@@ -61,9 +60,15 @@ object ReminderScheduler {
         }
     }
 
-    /** (Re)arm the base reminder for a starter. */
+    /**
+     * (Re)arm the base reminder for a starter. Uses setAlarmClock — the single
+     * most reliable alarm Android offers: exact, exempt from Doze AND app-standby
+     * AND (on most OEMs) battery-optimization killing, because breaking it would
+     * break the system clock. This is what makes the daily reminder fire ON THE
+     * DOT even if the app has been closed for days.
+     */
     fun scheduleNext(context: Context, starter: Starter) {
-        setExact(context, nextTrigger(starter), reminderIntent(context, starter.id, 0, 0))
+        setClock(context, nextTrigger(starter), reminderIntent(context, starter.id, 0, 0))
     }
 
     fun cancel(context: Context, starterId: String) {
@@ -100,16 +105,7 @@ object ReminderScheduler {
         setClock(context, System.currentTimeMillis() + minutes * 60_000L, pi)
     }
 
-    /** Exact + wakes from Doze. Exact is guaranteed via USE_EXACT_ALARM on API 33+. */
-    private fun setExact(context: Context, at: Long, pi: PendingIntent) {
-        val m = am(context)
-        if (Build.VERSION.SDK_INT < 31 || m.canScheduleExactAlarms())
-            m.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
-        else
-            m.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
-    }
-
-    /** Highest-reliability, Doze-proof user alarm. */
+    /** Highest-reliability, Doze- and standby-proof user alarm. */
     private fun setClock(context: Context, at: Long, pi: PendingIntent) {
         am(context).setAlarmClock(AlarmManager.AlarmClockInfo(at, showIntent(context)), pi)
     }

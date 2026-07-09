@@ -11,5 +11,10 @@ captures/
 # Machine-specific
 local.properties
 
+# Signing secrets — never commit
+keystore.properties
+*.jks
+*.keystore
+
 # macOS
 .DS_Store
